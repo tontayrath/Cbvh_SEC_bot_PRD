@@ -119,7 +119,7 @@ WARN_BAD_LINK = (
 # ══════════════════════════════════════════════════════════════════════════════
 
 _activation_cache: dict[int, tuple[bool, float]] = {}   # chat_id → (active, timestamp)
-ACTIVATION_CACHE_TTL = 60  # seconds
+ACTIVATION_CACHE_TTL = 300  # seconds (Optimized from 60 to 300 for faster processing)
 
 
 async def check_activation(chat_id: int) -> bool:
@@ -360,12 +360,15 @@ async def delete_and_warn(message, context, warning_text: str) -> None:
     chat = message.chat
     bot  = context.bot
 
-    try:
-        await message.delete()
-        logger.info("Message deleted.")
-    except Exception as e:
-        logger.error("Could not delete message: %s", e)
-        return
+    async def _do_delete():
+        try:
+            await message.delete()
+            logger.info("Message deleted.")
+        except Exception as e:
+            logger.debug("Could not delete message (might already be deleted): %s", e)
+            
+    # Trigger deletion in the background instantly
+    context.application.create_task(_do_delete())
 
     try:
         warning = await bot.send_message(
@@ -488,6 +491,14 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     context.application.create_task(log_group(chat.id, chat.title or str(chat.id)))
 
     if is_blocked_extension(file_name):
+        # ── INSTANT DELETE OPTIMIZATION ──
+        # Fire the delete request immediately in the background so it happens < 1s
+        async def _instant_delete():
+            try:
+                await message.delete()
+            except Exception:
+                pass
+        context.application.create_task(_instant_delete())
 
         logger.info("Blocked by extension: '%s' from %s in '%s'",
                     file_name, user.full_name if user else "?", chat.title or chat.id)

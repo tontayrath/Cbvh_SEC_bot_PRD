@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from log_event import log_event, log_group
+from log_event import log_event, log_group, log_group_leave
 
 import os
 import re
@@ -18,6 +18,7 @@ from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
+    ChatMemberHandler,
     filters,
     ContextTypes,
 )
@@ -611,6 +612,24 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
         logger.warning("Could not delete service message: %s", e)
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  GROUP LEAVE / KICK
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle when the bot's own membership status in a group changes."""
+    my_chat_member = update.my_chat_member
+    if not my_chat_member:
+        return
+
+    chat = my_chat_member.chat
+    new_status = my_chat_member.new_chat_member.status
+
+    if new_status in ["left", "kicked"]:
+        logger.info("Bot was removed or left chat: %s (%s)", chat.title, chat.id)
+        # Notify the dashboard asynchronously
+        asyncio.create_task(log_group_leave(chat.id))
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  HEARTBEAT
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -649,6 +668,9 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.Document.ALL & group_filter, handle_document))
     app.add_handler(MessageHandler(filters.TEXT & group_filter, handle_text))
     app.add_handler(MessageHandler((filters.PHOTO | filters.VIDEO) & group_filter, handle_caption))
+
+    # Track when the bot is kicked or leaves
+    app.add_handler(ChatMemberHandler(handle_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))
 
     # Auto-delete service messages (user joined, left, bot added/removed, etc.)
     service_filter = (

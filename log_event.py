@@ -64,3 +64,23 @@ async def log_group(chat_id: int, chat_title: str) -> None:
                     logger.error("Dashboard group log failed for %s: %s", url, e)
     except Exception as e:
         logger.error("Dashboard log client error: %s", e)
+
+
+async def log_group_leave(chat_id: int) -> None:
+    """Notify the dashboard that the bot was removed from a group."""
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            for url in DASHBOARD_URLS:
+                try:
+                    resp = await client.post(
+                        f"{url}/api/log_group_leave",
+                        headers={"X-Bot-Secret": BOT_API_SECRET},
+                        json={
+                            "chat_id": chat_id,
+                        }
+                    )
+                    resp.raise_for_status()
+                except Exception as e:
+                    logger.error("Dashboard group leave log failed for %s: %s", url, e)
+    except Exception as e:
+        logger.error("Dashboard log client error: %s", e)

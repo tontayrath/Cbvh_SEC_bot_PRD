@@ -601,6 +601,8 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
     if not message:
         return
 
+    logger.info("SERVICE MESSAGE: %s", update.to_dict())
+
     # Fallback: if the bot itself is the one who was left/kicked, log it!
     if message.left_chat_member and message.left_chat_member.id == context.bot.id:
         logger.info("Bot was removed (detected via service message): %s (%s)", message.chat.title, message.chat.id)

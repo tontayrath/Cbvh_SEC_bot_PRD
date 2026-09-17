@@ -19,6 +19,7 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     ChatMemberHandler,
+    TypeHandler,
     filters,
     ContextTypes,
 )
@@ -661,8 +662,15 @@ async def heartbeat(context: ContextTypes.DEFAULT_TYPE) -> None:
 #  MAIN
 # ══════════════════════════════════════════════════════════════════════════════
 
+async def debug_all_updates(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log every single update received to see if my_chat_member is even in the JSON."""
+    logger.info("DEBUG UPDATE: %s", update.to_dict())
+
 def main() -> None:
     app = Application.builder().token(API_TOKEN).build()
+
+    # Log absolutely every update before any other handler
+    app.add_handler(TypeHandler(Update, debug_all_updates), group=-1)
 
     group_filter = (
         filters.ChatType.GROUPS |

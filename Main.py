@@ -623,9 +623,15 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
 
     chat = my_chat_member.chat
     new_status = my_chat_member.new_chat_member.status
+    old_status = my_chat_member.old_chat_member.status
+
+    logger.info(
+        "MY_CHAT_MEMBER UPDATE: chat=%s (%s), old_status=%s, new_status=%s",
+        chat.title, chat.id, old_status, new_status
+    )
 
     if new_status in ["left", "kicked"]:
-        logger.info("Bot was removed or left chat: %s (%s)", chat.title, chat.id)
+        logger.info("Triggering log_group_leave for chat: %s", chat.id)
         # Notify the dashboard
         await log_group_leave(chat.id)
 

@@ -626,8 +626,8 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
 
     if new_status in ["left", "kicked"]:
         logger.info("Bot was removed or left chat: %s (%s)", chat.title, chat.id)
-        # Notify the dashboard asynchronously
-        asyncio.create_task(log_group_leave(chat.id))
+        # Notify the dashboard
+        await log_group_leave(chat.id)
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  HEARTBEAT

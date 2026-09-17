@@ -616,6 +616,18 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
                 logger.info("Bot was ADDED to group: %s (%s)", message.chat.title, message.chat.id)
                 _activation_cache.pop(message.chat.id, None)
                 await log_group(message.chat.id, message.chat.title or str(message.chat.id))
+                
+                # Check if we are admin, if not send a warning
+                try:
+                    bot_member = await context.bot.get_chat_member(message.chat.id, context.bot.id)
+                    if bot_member.status != "administrator":
+                        await context.bot.send_message(
+                            chat_id=message.chat.id,
+                            text="⚠️ <b>ចំណាំ:</b> ខ្ញុំមិនទាន់មានសិទ្ធិជា Admin ទេ។\n\nសូម Promote ខ្ញុំជា Admin (ផ្តល់សិទ្ធិលុបសារ) ដើម្បីឲ្យខ្ញុំអាចការពារ Group នេះបាន!",
+                            parse_mode="HTML"
+                        )
+                except Exception as e:
+                    logger.warning("Could not send admin warning: %s", e)
                 break
 
     try:

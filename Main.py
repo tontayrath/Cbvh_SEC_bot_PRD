@@ -628,6 +628,20 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
                         context.application.create_task(_auto_delete(context.bot, message.chat.id, msg.message_id, 60))
                 except Exception as e:
                     logger.warning("Could not send admin warning: %s", e)
+                
+                # Check if we are activated, if not send activation warning
+                try:
+                    is_active = await check_activation(message.chat.id)
+                    if not is_active:
+                        msg_act = await context.bot.send_message(
+                            chat_id=message.chat.id,
+                            text=WARN_NOT_ACTIVATED,
+                            parse_mode="HTML"
+                        )
+                        context.application.create_task(_auto_delete(context.bot, message.chat.id, msg_act.message_id, 60))
+                except Exception as e:
+                    logger.warning("Could not send activation warning: %s", e)
+                    
                 break
 
     try:

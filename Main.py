@@ -606,6 +606,7 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
     # Fallback: if the bot itself is the one who was left/kicked, log it!
     if message.left_chat_member and message.left_chat_member.id == context.bot.id:
         logger.info("Bot was removed (detected via service message): %s (%s)", message.chat.title, message.chat.id)
+        _activation_cache.pop(message.chat.id, None)
         await log_group_leave(message.chat.id)
 
     # Fallback: if the bot itself was ADDED to the group, log it!
@@ -613,6 +614,7 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
         for member in message.new_chat_members:
             if member.id == context.bot.id:
                 logger.info("Bot was ADDED to group: %s (%s)", message.chat.title, message.chat.id)
+                _activation_cache.pop(message.chat.id, None)
                 await log_group(message.chat.id, message.chat.title or str(message.chat.id))
                 break
 

@@ -618,6 +618,10 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
         )
     except Exception as e:
         logger.warning("Could not delete service message: %s", e)
+        error_msg = str(e).lower()
+        if "kicked" in error_msg or "not a member" in error_msg or "forbidden" in error_msg:
+            logger.info("Ultimate fallback: Bot was kicked! Updating dashboard for chat %s", message.chat.id)
+            await log_group_leave(message.chat.id)
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  GROUP LEAVE / KICK

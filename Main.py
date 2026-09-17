@@ -591,9 +591,7 @@ async def handle_caption(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await delete_and_warn(message, context,
                           WARN_BAD_LINK.format(domain=domain, reason=reason, user=user_mention))
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  SERVICE MESSAGE CLEANUP (join / leave / add / remove logs)
-# ══════════════════════════════════════════════════════════════════════════════
+_admin_warning_msgs: dict[int, int] = {}  # chat_id -> message_id
 
 async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Delete service messages (user joined/left, pinned message, etc.) to keep chat clean."""
@@ -621,11 +619,13 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
                 try:
                     bot_member = await context.bot.get_chat_member(message.chat.id, context.bot.id)
                     if bot_member.status != "administrator":
-                        await context.bot.send_message(
+                        msg = await context.bot.send_message(
                             chat_id=message.chat.id,
                             text="⚠️ <b>ចំណាំ:</b> ខ្ញុំមិនទាន់មានសិទ្ធិជា Admin ទេ។\n\nសូម Promote ខ្ញុំជា Admin (ផ្តល់សិទ្ធិលុបសារ) ដើម្បីឲ្យខ្ញុំអាចការពារ Group នេះបាន!",
                             parse_mode="HTML"
                         )
+                        _admin_warning_msgs[message.chat.id] = msg.message_id
+                        context.application.create_task(_auto_delete(context.bot, message.chat.id, msg.message_id, 60))
                 except Exception as e:
                     logger.warning("Could not send admin warning: %s", e)
                 break
@@ -668,6 +668,28 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
         logger.info("Triggering log_group_leave for chat: %s", chat.id)
         # Notify the dashboard
         await log_group_leave(chat.id)
+    elif new_status == "administrator" and old_status != "administrator":
+        # Bot was promoted to admin!
+        logger.info("Bot promoted to admin in chat: %s", chat.id)
+        
+        # Delete the warning message if we sent one
+        warning_msg_id = _admin_warning_msgs.pop(chat.id, None)
+        if warning_msg_id:
+            try:
+                await context.bot.delete_message(chat_id=chat.id, message_id=warning_msg_id)
+            except Exception:
+                pass
+                
+        # Send a thank you message and auto-delete it after 15 seconds
+        try:
+            msg = await context.bot.send_message(
+                chat_id=chat.id,
+                text="✅ <b>អរគុណ!</b> ខ្ញុំទទួលបានសិទ្ធិជា Admin ហើយ។\n\nខ្ញុំនឹងចាប់ផ្តើមការពារ Group នេះឥឡូវនេះ!",
+                parse_mode="HTML"
+            )
+            context.application.create_task(_auto_delete(context.bot, chat.id, msg.message_id, 15))
+        except Exception as e:
+            logger.warning("Could not send admin thank you msg: %s", e)
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  HEARTBEAT

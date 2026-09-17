@@ -608,6 +608,14 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
         logger.info("Bot was removed (detected via service message): %s (%s)", message.chat.title, message.chat.id)
         await log_group_leave(message.chat.id)
 
+    # Fallback: if the bot itself was ADDED to the group, log it!
+    if message.new_chat_members:
+        for member in message.new_chat_members:
+            if member.id == context.bot.id:
+                logger.info("Bot was ADDED to group: %s (%s)", message.chat.title, message.chat.id)
+                await log_group(message.chat.id, message.chat.title or str(message.chat.id))
+                break
+
     try:
         await message.delete()
         logger.info(

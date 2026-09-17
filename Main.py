@@ -596,10 +596,15 @@ async def handle_caption(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 # ══════════════════════════════════════════════════════════════════════════════
 
 async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Auto-delete service messages like 'X added Y' or 'X left the group'."""
-    message = update.message
+    """Delete service messages (user joined/left, pinned message, etc.) to keep chat clean."""
+    message = update.message or update.effective_message
     if not message:
         return
+
+    # Fallback: if the bot itself is the one who was left/kicked, log it!
+    if message.left_chat_member and message.left_chat_member.id == context.bot.id:
+        logger.info("Bot was removed (detected via service message): %s (%s)", message.chat.title, message.chat.id)
+        await log_group_leave(message.chat.id)
 
     try:
         await message.delete()

@@ -1,6 +1,10 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+import os
+import httpx
+import logging
+
 DASHBOARD_URLS = [url.strip() for url in os.environ.get("DASHBOARD_URL", "http://localhost:3000").split(",") if url.strip()]
 BOT_API_SECRET = os.environ.get("BOT_API_SECRET", "bot-secret-key")
 BOT_NAME = os.environ.get("BOT_NAME", "EXE Guard Bot")

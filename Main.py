@@ -1,7 +1,31 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from log_event import log_event, log_group, log_group_leave
+DASHBOARD_URLS = [url.strip() for url in os.environ.get("DASHBOARD_URL", "http://localhost:3000").split(",") if url.strip()]
+BOT_API_SECRET = os.environ.get("BOT_API_SECRET", "bot-secret-key")
+BOT_NAME = os.environ.get("BOT_NAME", "EXE Guard Bot")
+
+async def post_dashboard(endpoint: str, payload: dict, broadcast: bool = False):
+    results = []
+    async with httpx.AsyncClient(timeout=10) as client:
+        for url in DASHBOARD_URLS:
+            try:
+                resp = await client.post(f"{url}{endpoint}", headers={"X-Bot-Secret": BOT_API_SECRET}, json=payload)
+                if resp.status_code == 200:
+                    if not broadcast: return resp.json()
+                    results.append(resp.json())
+            except Exception as e:
+                pass
+    return results if broadcast else None
+
+async def log_event(chat_id, chat_title, file_name, block_type, reason, sender_name):
+    await post_dashboard("/api/log_event", {"bot_name": BOT_NAME, "chat_id": chat_id, "chat_title": chat_title, "file_name": file_name, "block_type": block_type, "reason": reason, "sender_name": sender_name}, True)
+
+async def log_group(chat_id, chat_title):
+    await post_dashboard("/api/log_group", {"bot_name": BOT_NAME, "chat_id": chat_id, "chat_title": chat_title}, True)
+
+async def log_group_leave(chat_id):
+    await post_dashboard("/api/log_group_leave", {"chat_id": chat_id}, True)
 
 import os
 import re
@@ -135,32 +159,12 @@ async def check_activation(chat_id: int) -> bool:
     if cached and (now - cached[1]) < ACTIVATION_CACHE_TTL:
         return cached[0]
 
-    dashboard_urls = [
-        url.strip()
-        for url in os.environ.get("DASHBOARD_URL", "http://localhost:3000").split(",")
-        if url.strip()
-    ]
-    bot_secret = os.environ.get("BOT_API_SECRET", "bot-secret-key")
-
-    for url in dashboard_urls:
-        try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                resp = await client.post(
-                    f"{url}/api/check_activation",
-                    headers={"X-Bot-Secret": bot_secret},
-                    json={"chat_id": chat_id, "token": API_TOKEN},
-                )
-                if resp.status_code == 200:
-                    active = resp.json().get("active", False)
-                    _activation_cache[chat_id] = (active, now)
-                    logger.info(
-                        "Activation check for chat %s: %s",
-                        chat_id,
-                        "ACTIVE" if active else "INACTIVE",
-                    )
-                    return active
-        except Exception as e:
-            logger.warning("Activation check failed for %s: %s", url, e)
+    data = await post_dashboard("/api/check_activation", {"chat_id": chat_id, "token": API_TOKEN})
+    if data is not None:
+        active = data.get("active", False)
+        _activation_cache[chat_id] = (active, now)
+        logger.info("Activation check for chat %s: %s", chat_id, "ACTIVE" if active else "INACTIVE")
+        return active
 
     # If all dashboard URLs fail, default to active so we don't break
     # protection when the dashboard is temporarily unreachable.
@@ -280,8 +284,6 @@ def check_domain_local(domain: str) -> tuple[bool, str]:
         candidate = ".".join(parts[i:])
         if candidate in BLOCKED_DOMAINS:
             return True, f"Domain is on the blocked list ({candidate})"
-    for i in range(len(parts) - 1):
-        candidate = ".".join(parts[i:])
         if candidate in SUSPICIOUS_PARENT_DOMAINS:
             return True, f"Subdomain of a platform commonly abused for phishing ({candidate})"
     return False, ""
@@ -417,34 +419,15 @@ async def handle_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     key = args[0].strip().upper()
-    dashboard_urls = [
-        url.strip()
-        for url in os.environ.get("DASHBOARD_URL", "http://localhost:3000").split(",")
-        if url.strip()
-    ]
-    bot_secret = os.environ.get("BOT_API_SECRET", "bot-secret-key")
-
     activated = False
     error_reason = "Could not reach the dashboard"
 
-    for url in dashboard_urls:
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.post(
-                    f"{url}/api/activate",
-                    headers={"X-Bot-Secret": bot_secret},
-                    json={"key": key, "chat_id": chat.id},
-                )
-                data = resp.json()
-                if resp.status_code == 200 and data.get("ok"):
-                    activated = True
-                    break
-                else:
-                    error_reason = data.get("error", "Unknown error")
-                    break
-        except Exception as e:
-            logger.warning("Activate call failed for %s: %s", url, e)
-            error_reason = str(e)
+    data = await post_dashboard("/api/activate", {"key": key, "chat_id": chat.id})
+    if data is not None:
+        if data.get("ok"):
+            activated = True
+        else:
+            error_reason = data.get("error", "Unknown error")
 
     if activated:
         # Clear the activation cache so the bot picks up the new state immediately
@@ -711,21 +694,7 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def heartbeat(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a heartbeat ping to the dashboard every 30s to show the bot is alive."""
-    dashboard_urls = [url.strip() for url in os.environ.get("DASHBOARD_URL", "http://localhost:3000").split(",") if url.strip()]
-    bot_secret = os.environ.get("BOT_API_SECRET", "bot-secret-key")
-    try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            for url in dashboard_urls:
-                try:
-                    await client.post(
-                        f"{url}/api/heartbeat",
-                        headers={"X-Bot-Secret": bot_secret},
-                        json={"token": API_TOKEN}
-                    )
-                except Exception as e:
-                    logger.debug("Dashboard heartbeat failed for %s: %s", url, e)
-    except Exception as e:
-        logger.debug("Dashboard heartbeat client error: %s", e)
+    await post_dashboard("/api/heartbeat", {"token": API_TOKEN}, broadcast=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  MAIN

@@ -1,6 +1,6 @@
 module.exports = {
-  apps : [{
-    name: "ExeGuardBot",
+  apps: [{
+    name: "@Cbvh_SEC_bot_PRD",
     script: "./Main.py",
     interpreter: "python", // On Windows, ensure 'python' is in PATH. If using venv, specify full path to python.exe
     watch: false,

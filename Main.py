@@ -188,6 +188,16 @@ async def check_activation(chat_id: int, bot=None) -> bool:
                 asyncio.create_task(_auto_delete(bot, chat_id, msg.message_id, 15))
             except Exception as e:
                 logger.error("Failed to send proactive activation success: %s", e)
+        elif not active and old_active is True and bot:
+            try:
+                msg = await bot.send_message(
+                    chat_id=chat_id,
+                    text="⚠️ <b>Dashboard Approval Revoked!</b>\n\n" + WARN_NOT_ACTIVATED,
+                    parse_mode="HTML"
+                )
+                _activation_warning_msgs[chat_id] = msg.message_id
+            except Exception as e:
+                logger.error("Failed to send proactive activation warning: %s", e)
                 
         return active
 

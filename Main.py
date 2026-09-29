@@ -180,20 +180,20 @@ async def check_activation(chat_id: int) -> bool:
 
 
 WARN_NOT_ACTIVATED = (
-    "🔒 <b>Bot មិនទាន់ត្រូវបានធ្វើឱ្យសកម្មក្នុង Group នេះទេ។</b>\n\n"
-    "សូមប្រើពាក្យបញ្ជា /activate <code>KEY</code> ដើម្បីដាក់ Bot ឱ្យដំណើរការ។\n"
-    "សូមទាក់ទង Admin ដើម្បីទទួលបាន Activation Key។"
+    "🔒 <b>Bot is not yet activated in this Group.</b>\n\n"
+    "Please use the command /activate <code>KEY</code> to activate the Bot.\n"
+    "Contact an Admin to get an Activation Key."
 )
 
 ACTIVATE_SUCCESS = (
-    "✅ <b>Bot ត្រូវបានធ្វើឱ្យសកម្មដោយជោគជ័យ!</b>\n\n"
-    "🛡️ Bot នឹងការពារ Group នេះពីឥឡូវទៅ។"
+    "✅ <b>Bot has been activated successfully!</b>\n\n"
+    "🛡️ The bot will protect this Group from now on."
 )
 
 ACTIVATE_FAIL = (
-    "❌ <b>ការធ្វើឱ្យសកម្មបរាជ័យ!</b>\n\n"
+    "❌ <b>Activation failed!</b>\n\n"
     "⚠️ Reason: <i>{reason}</i>\n"
-    "សូមពិនិត្យ Key ម្ដងទៀត ឬទាក់ទង Admin។"
+    "Please check your Key again or contact an Admin."
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -417,7 +417,7 @@ async def handle_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if not args:
         reply = await context.bot.send_message(
             chat_id=chat.id,
-            text="⚠️ <b>សូមបញ្ចូល Activation Key!</b>\n\nExample: <code>/activate EG-A1B2-C3D4-E5F6</code>",
+            text="⚠️ <b>Please provide an Activation Key!</b>\n\nExample: <code>/activate EG-A1B2-C3D4-E5F6</code>",
             parse_mode="HTML",
         )
         context.application.create_task(
@@ -612,7 +612,7 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
                         if bot_member.status != "administrator":
                             msg = await context.bot.send_message(
                                 chat_id=chat_id,
-                                text="⚠️ <b>ចំណាំ:</b> ខ្ញុំមិនទាន់មានសិទ្ធិជា Admin ទេ។\n\nសូម Promote ខ្ញុំជា Admin (ផ្តល់សិទ្ធិលុបសារ) ដើម្បីឲ្យខ្ញុំអាចការពារ Group នេះបាន!",
+                                text="⚠️ <b>Note:</b> I am not an Admin yet.\n\nPlease promote me to Admin (give Delete Messages permission) so I can protect this Group!",
                                 parse_mode="HTML"
                             )
                             _admin_warning_msgs[chat_id] = msg.message_id
@@ -690,7 +690,7 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
         try:
             msg = await context.bot.send_message(
                 chat_id=chat.id,
-                text="✅ <b>អរគុណ!</b> ខ្ញុំទទួលបានសិទ្ធិជា Admin ហើយ។\n\nខ្ញុំនឹងចាប់ផ្តើមការពារ Group នេះឥឡូវនេះ!",
+                text="✅ <b>Thank you!</b> I now have Admin privileges.\n\nI will start protecting this Group right away!",
                 parse_mode="HTML"
             )
             context.application.create_task(_auto_delete(context.bot, chat.id, msg.message_id, 15))

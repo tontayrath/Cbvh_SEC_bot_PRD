@@ -199,8 +199,8 @@ async def check_activation(chat_id: int, bot=None) -> bool:
 
 WARN_NOT_ACTIVATED = (
     "🔒 <b>Bot is not yet activated in this Group.</b>\n\n"
-    "Please use the command /activate <code>KEY</code> to activate the Bot.\n"
-    "Contact an Admin to get an Activation Key."
+    "Please wait for a Dashboard Admin to approve this group.\n"
+    "(Or use the command /activate <code>KEY</code> if you have an Activation Key)."
 )
 
 ACTIVATE_SUCCESS = (
@@ -713,11 +713,19 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
             except Exception:
                 pass
                 
+        # Check if we are actually activated before promising to protect the group
+        is_active = await check_activation(chat.id, context.bot)
+        
+        if is_active:
+            msg_text = "✅ <b>Thank you!</b> I now have Admin privileges.\n\nI will start protecting this Group right away!"
+        else:
+            msg_text = "✅ <b>Thank you!</b> I now have Admin privileges.\n\nHowever, I am still waiting for Dashboard Admin approval to start protecting."
+            
         # Send a thank you message and auto-delete it after 15 seconds
         try:
             msg = await context.bot.send_message(
                 chat_id=chat.id,
-                text="✅ <b>Thank you!</b> I now have Admin privileges.\n\nI will start protecting this Group right away!",
+                text=msg_text,
                 parse_mode="HTML"
             )
             context.application.create_task(_auto_delete(context.bot, chat.id, msg.message_id, 15))

@@ -31,6 +31,9 @@ async def log_group(chat_id, chat_title):
 async def log_group_leave(chat_id):
     await post_dashboard("/api/log_group_leave", {"chat_id": chat_id}, True)
 
+async def set_warning_msg(chat_id, message_id):
+    await post_dashboard("/api/set_warning_msg", {"chat_id": chat_id, "message_id": message_id}, True)
+
 import os
 import re
 import io
@@ -196,6 +199,7 @@ async def check_activation(chat_id: int, bot=None) -> bool:
                     parse_mode="HTML"
                 )
                 _activation_warning_msgs[chat_id] = msg.message_id
+                await set_warning_msg(chat_id, msg.message_id)
             except Exception as e:
                 logger.error("Failed to send proactive activation warning: %s", e)
                 
@@ -667,6 +671,7 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
                                 parse_mode="HTML"
                             )
                             _activation_warning_msgs[chat_id] = msg_act.message_id
+                            await set_warning_msg(chat_id, msg_act.message_id)
                     except Exception as e:
                         logger.warning("Could not send activation warning: %s", e)
                 

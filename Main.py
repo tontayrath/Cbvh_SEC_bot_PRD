@@ -631,7 +631,7 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
                         logger.warning("Could not send activation warning: %s", e)
                 
                 context.application.create_task(send_welcome_warnings(message.chat.id))
-                break
+                return  # <--- CRITICAL FIX: Do NOT delete the service message when the bot itself is added! Deleting it instantly corrupts the Telegram client's Admin/Member list cache!
 
     try:
         await message.delete()

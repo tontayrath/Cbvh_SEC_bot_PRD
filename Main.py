@@ -160,8 +160,11 @@ async def check_activation(chat_id: int) -> bool:
     """
     now = time.monotonic()
     cached = _activation_cache.get(chat_id)
-    if cached and (now - cached[1]) < ACTIVATION_CACHE_TTL:
-        return cached[0]
+    if cached:
+        is_active, timestamp = cached
+        ttl = ACTIVATION_CACHE_TTL if is_active else 30
+        if (now - timestamp) < ttl:
+            return is_active
 
     data = await post_dashboard("/api/check_activation", {"chat_id": chat_id, "token": API_TOKEN})
     if data is not None:

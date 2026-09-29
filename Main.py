@@ -177,7 +177,15 @@ async def check_activation(chat_id: int, bot=None) -> bool:
         
         if active and old_active is False and bot:
             try:
-                await bot.send_message(chat_id=chat_id, text=ACTIVATE_SUCCESS, parse_mode="HTML")
+                old_warn_msg_id = _activation_warning_msgs.pop(chat_id, None)
+                if old_warn_msg_id:
+                    try:
+                        await bot.delete_message(chat_id=chat_id, message_id=old_warn_msg_id)
+                    except Exception:
+                        pass
+                
+                msg = await bot.send_message(chat_id=chat_id, text=ACTIVATE_SUCCESS, parse_mode="HTML")
+                asyncio.create_task(_auto_delete(bot, chat_id, msg.message_id, 15))
             except Exception as e:
                 logger.error("Failed to send proactive activation success: %s", e)
                 
@@ -449,11 +457,19 @@ async def handle_activate(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if activated:
         # Clear the activation cache so the bot picks up the new state immediately
         _activation_cache.pop(chat.id, None)
+        old_warn_msg_id = _activation_warning_msgs.pop(chat.id, None)
+        if old_warn_msg_id:
+            try:
+                await context.bot.delete_message(chat_id=chat.id, message_id=old_warn_msg_id)
+            except Exception:
+                pass
+                
         reply = await context.bot.send_message(
             chat_id=chat.id,
             text=ACTIVATE_SUCCESS,
             parse_mode="HTML",
         )
+        context.application.create_task(_auto_delete(context.bot, chat.id, reply.message_id, 15))
         logger.info("Group %s (%s) activated with key %s", chat.id, chat.title or "?", key)
     else:
         reply = await context.bot.send_message(
@@ -592,6 +608,7 @@ async def handle_caption(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                           WARN_BAD_LINK.format(domain=domain, reason=reason, user=user_mention))
 
 _admin_warning_msgs: dict[int, int] = {}  # chat_id -> message_id
+_activation_warning_msgs: dict[int, int] = {}  # chat_id -> message_id
 
 async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Delete service messages (user joined/left, pinned message, etc.) to keep chat clean."""
@@ -639,7 +656,7 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
                                 text=WARN_NOT_ACTIVATED,
                                 parse_mode="HTML"
                             )
-                            context.application.create_task(_auto_delete(context.bot, chat_id, msg_act.message_id, 60))
+                            _activation_warning_msgs[chat_id] = msg_act.message_id
                     except Exception as e:
                         logger.warning("Could not send activation warning: %s", e)
                 

@@ -152,7 +152,7 @@ _activation_cache: dict[int, tuple[bool, float]] = {}   # chat_id → (active, t
 ACTIVATION_CACHE_TTL = 300  # seconds (Optimized from 60 to 300 for faster processing)
 
 
-async def check_activation(chat_id: int) -> bool:
+async def check_activation(chat_id: int, bot=None) -> bool:
     """Ask the dashboard whether this group is activated.
 
     Results are cached for ACTIVATION_CACHE_TTL seconds so we don't
@@ -169,8 +169,18 @@ async def check_activation(chat_id: int) -> bool:
     data = await post_dashboard("/api/check_activation", {"chat_id": chat_id, "token": API_TOKEN})
     if data is not None:
         active = data.get("active", False)
+        old_cached = _activation_cache.get(chat_id)
+        old_active = old_cached[0] if old_cached else None
+        
         _activation_cache[chat_id] = (active, now)
         logger.info("Activation check for chat %s: %s", chat_id, "ACTIVE" if active else "INACTIVE")
+        
+        if active and old_active is False and bot:
+            try:
+                await bot.send_message(chat_id=chat_id, text=ACTIVATE_SUCCESS, parse_mode="HTML")
+            except Exception as e:
+                logger.error("Failed to send proactive activation success: %s", e)
+                
         return active
 
     # If all dashboard URLs fail, default to active so we don't break
@@ -465,7 +475,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     # ── Activation gate ──────────────────────────────────────────────────────
-    if not await check_activation(message.chat.id):
+    if not await check_activation(message.chat.id, context.bot):
         return
 
     doc          = message.document
@@ -532,7 +542,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     # ── Activation gate ──────────────────────────────────────────────────────
-    if not await check_activation(message.chat.id):
+    if not await check_activation(message.chat.id, context.bot):
         return
 
     is_bad, domain, reason = await scan_links(message.text)
@@ -562,7 +572,7 @@ async def handle_caption(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     # ── Activation gate ──────────────────────────────────────────────────────
-    if not await check_activation(message.chat.id):
+    if not await check_activation(message.chat.id, context.bot):
         return
 
     is_bad, domain, reason = await scan_links(message.caption)
@@ -622,7 +632,7 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
                     
                     # Check if we are activated, if not send activation warning
                     try:
-                        is_active = await check_activation(chat_id)
+                        is_active = await check_activation(chat_id, context.bot)
                         if not is_active:
                             msg_act = await context.bot.send_message(
                                 chat_id=chat_id,

@@ -601,34 +601,36 @@ async def handle_service_message(update: Update, context: ContextTypes.DEFAULT_T
                 logger.info("Bot was ADDED to group: %s (%s)", message.chat.title, message.chat.id)
                 _activation_cache.pop(message.chat.id, None)
                 await log_group(message.chat.id, message.chat.title or str(message.chat.id))
-                
-                # Check if we are admin, if not send a warning
-                try:
-                    bot_member = await context.bot.get_chat_member(message.chat.id, context.bot.id)
-                    if bot_member.status != "administrator":
-                        msg = await context.bot.send_message(
-                            chat_id=message.chat.id,
-                            text="⚠️ <b>ចំណាំ:</b> ខ្ញុំមិនទាន់មានសិទ្ធិជា Admin ទេ។\n\nសូម Promote ខ្ញុំជា Admin (ផ្តល់សិទ្ធិលុបសារ) ដើម្បីឲ្យខ្ញុំអាចការពារ Group នេះបាន!",
-                            parse_mode="HTML"
-                        )
-                        _admin_warning_msgs[message.chat.id] = msg.message_id
-                        context.application.create_task(_auto_delete(context.bot, message.chat.id, msg.message_id, 60))
-                except Exception as e:
-                    logger.warning("Could not send admin warning: %s", e)
-                
-                # Check if we are activated, if not send activation warning
-                try:
-                    is_active = await check_activation(message.chat.id)
-                    if not is_active:
-                        msg_act = await context.bot.send_message(
-                            chat_id=message.chat.id,
-                            text=WARN_NOT_ACTIVATED,
-                            parse_mode="HTML"
-                        )
-                        context.application.create_task(_auto_delete(context.bot, message.chat.id, msg_act.message_id, 60))
-                except Exception as e:
-                    logger.warning("Could not send activation warning: %s", e)
+                async def send_welcome_warnings(chat_id):
+                    await asyncio.sleep(5)  # Give user time to complete the admin promotion UI
+                    # Check if we are admin, if not send a warning
+                    try:
+                        bot_member = await context.bot.get_chat_member(chat_id, context.bot.id)
+                        if bot_member.status != "administrator":
+                            msg = await context.bot.send_message(
+                                chat_id=chat_id,
+                                text="⚠️ <b>ចំណាំ:</b> ខ្ញុំមិនទាន់មានសិទ្ធិជា Admin ទេ។\n\nសូម Promote ខ្ញុំជា Admin (ផ្តល់សិទ្ធិលុបសារ) ដើម្បីឲ្យខ្ញុំអាចការពារ Group នេះបាន!",
+                                parse_mode="HTML"
+                            )
+                            _admin_warning_msgs[chat_id] = msg.message_id
+                            context.application.create_task(_auto_delete(context.bot, chat_id, msg.message_id, 60))
+                    except Exception as e:
+                        logger.warning("Could not send admin warning: %s", e)
                     
+                    # Check if we are activated, if not send activation warning
+                    try:
+                        is_active = await check_activation(chat_id)
+                        if not is_active:
+                            msg_act = await context.bot.send_message(
+                                chat_id=chat_id,
+                                text=WARN_NOT_ACTIVATED,
+                                parse_mode="HTML"
+                            )
+                            context.application.create_task(_auto_delete(context.bot, chat_id, msg_act.message_id, 60))
+                    except Exception as e:
+                        logger.warning("Could not send activation warning: %s", e)
+                
+                context.application.create_task(send_welcome_warnings(message.chat.id))
                 break
 
     try:

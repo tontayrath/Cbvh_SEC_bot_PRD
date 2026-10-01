@@ -152,7 +152,7 @@ WARN_BAD_LINK = (
 # ══════════════════════════════════════════════════════════════════════════════
 
 _activation_cache: dict[int, tuple[bool, float]] = {}   # chat_id → (active, timestamp)
-ACTIVATION_CACHE_TTL = 300  # seconds (Optimized from 60 to 300 for faster processing)
+ACTIVATION_CACHE_TTL = 60  # seconds (Optimized to 60 for faster revocation)
 
 
 async def check_activation(chat_id: int, bot=None) -> bool:
@@ -172,6 +172,25 @@ async def check_activation(chat_id: int, bot=None) -> bool:
     data = await post_dashboard("/api/check_activation", {"chat_id": chat_id, "token": API_TOKEN})
     if data is not None:
         active = data.get("active", False)
+        
+        if not active and data.get("expired_added_at", False) and bot:
+            logger.info("Group %s expired due to time limit. Leaving...", chat_id)
+            try:
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text="⚠️ <b>Activation Time Expired!</b>\n\nI was not activated within 24 hours, so I am leaving this group.",
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                logger.error("Failed to send goodbye message: %s", e)
+                
+            try:
+                await bot.leave_chat(chat_id)
+            except Exception as e:
+                logger.error("Failed to leave expired group %s: %s", chat_id, e)
+                
+            return False
+
         old_cached = _activation_cache.get(chat_id)
         old_active = old_cached[0] if old_cached else None
         
